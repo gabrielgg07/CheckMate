@@ -1,0 +1,127 @@
+# =====================
+# macOS
+# =====================
+.DS_Store
+.AppleDouble
+.LSOverride
+__MACOSX/
+
+# =====================
+# Python / Flask Backend
+# =====================
+# Environments
+venv/
+env/
+*.env
+.env.*
+# Bytecode / cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pdb
+*.pkl
+# Virtualenv folders (any level)
+*/venv/
+*/env/
+# Logs and database files
+*.log
+*.sqlite3
+instance/
+# IDE files
+.idea/
+.vscode/
+*.code-workspace
+
+# Flask specific
+*.db
+.mypy_cache/
+.pytest_cache/
+.cache/
+coverage/
+htmlcov/
+*.cover
+*.py,cover
+nosetests.xml
+*.egg-info/
+dist/
+build/
+
+# =====================
+# Swift / Xcode iOS App
+# =====================
+# Xcode user data
+*.xcuserstate
+*.xcuserdata/
+DerivedData/
+build/
+*.xcworkspace/xcuserdata
+# Swift Package Manager
+.swiftpm/
+.build/
+# iOS build artifacts
+*.ipa
+*.dSYM
+*.xcodeproj/project.xcworkspace/
+# Fastlane / CocoaPods
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+Pods/
+Podfile.lock
+*.xcworkspace
+# SwiftPM Package.resolved
+Package.resolved
+
+# =====================
+# General
+# =====================
+# OS files
+Thumbs.db
+ehthumbs.db
+Icon?
+# Backup files
+*.bak
+*.swp
+*.swo
+*~
+# Logs
+*.log
+# Lock files
+*.lock
+# Compressed
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+# Temporary
+tmp/
+temp/
+*.tmp
+# Environment config
+.env
+.env.local
+.env.development
+.env.production
+.env.test
+
+# =====================
+# ngrok / local dev
+# =====================
+ngrok.log
+.ngrok2/
+.ngrok/
+*.pid
+*.sock
+
+# =====================
+# Misc
+# =====================
+*.crt
+*.pem
+*.key
+*.keystore
+*.mobileprovision
+*.orig
+*.rej
