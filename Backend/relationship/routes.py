@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from database.db import db
 from relationship.models import Friendship
 from auth.models import User
+from auth.models import User
 
 relationships_bp = Blueprint("relationships", __name__)
 
@@ -58,3 +59,29 @@ def grant_control():
     db.session.commit()
 
     return jsonify({"message": f"Control {'granted' if allow else 'revoked'}"}), 200
+
+
+# 🔍 Search for users (privacy-safe)
+@relationships_bp.route("/search", methods=["GET"])
+def search_users():
+    query = request.args.get("q", "").strip().lower()
+    if not query:
+        return jsonify([])
+
+    results = (
+        User.query
+        .filter(
+            (User.name.ilike(f"%{query}%"))
+        )
+        .limit(20)
+        .all()
+    )
+
+    # ✅ Return only public-safe fields
+    return jsonify([
+        {
+            "id": u.id,
+            "name": u.name,
+            "profile_image_url": u.profile_image_url
+        } for u in results
+    ])

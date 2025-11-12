@@ -12,6 +12,7 @@ struct ScreenControlApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .preferredColorScheme(.light)  
         }
     }
 }

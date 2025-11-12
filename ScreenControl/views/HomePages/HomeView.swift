@@ -67,13 +67,7 @@ struct HomeView: View {
 
 
 
-struct RequestsView: View {
-    var body: some View {
-        Text("🔓 Unlock requests from buddies")
-            .font(.title3)
-            .padding()
-    }
-}
+
 
 struct StatsView: View {
     var body: some View {

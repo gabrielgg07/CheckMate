@@ -50,7 +50,12 @@ build/
 # =====================
 # Swift / Xcode iOS App
 # =====================
+# Xcode project files
+*.xcodeproj/
+*.xcworkspace/
+
 # Xcode user data
+
 *.xcuserstate
 *.xcuserdata/
 DerivedData/
