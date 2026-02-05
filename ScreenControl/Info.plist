@@ -7,29 +7,40 @@
 		<dict>
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
-            
 			<key>CFBundleURLName</key>
 			<string>Google</string>
-            
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.googleusercontent.apps.172460374843-dllgb5kk8c2cb559b9tqjon03qo4u2c1</string>
 			</array>
+			<key>UIDeviceFamily</key>
+			<array>
+				<integer>1</integer>
+			</array>
+			<key>UISupportedInterfaceOrientations</key>
+			<array>
+				<string>UIInterfaceOrientationPortrait</string>
+			</array>
             
-            <key>UISupportedInterfaceOrientations</key>
-            <array>
-                <string>UIInterfaceOrientationPortrait</string>
-            </array>
-            
-            <key>UIDeviceFamily</key>
-            <array>
-                <integer>1</integer> <!-- 1 = iPhone only -->
-            </array>
-
 
 		</dict>
 	</array>
 	<key>NSPrivacyUsageDescription</key>
 	<string>We need permission to manage app access using Screen Time controls.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+		<string>fetch</string>
+		<string>processing</string>
+	</array>
+    
+    <!-- REQUIRED FOR DEVICE ACTIVITY EXTENSION -->
+    <key>NSExtension</key>
+    <dict>
+            <key>NSExtensionPointIdentifier</key>
+            <string>com.apple.deviceactivity-monitor</string>
+            <key>NSExtensionPrincipalClass</key>
+            <string>$(PRODUCT_MODULE_NAME).ScreenControlMonitor</string>
+    </dict>
 </dict>
 </plist>

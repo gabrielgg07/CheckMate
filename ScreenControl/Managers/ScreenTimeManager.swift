@@ -10,17 +10,56 @@ class ScreenTimeManager: ObservableObject {
 
     @Published var authorized = false
     @Published var selection = FamilyActivitySelection()
+    @Published var selectedAppBundleIDs: [String] = []
     @Published var selectedAppNames: [String] = []
+    @Published var isLoading = true
+    
+    private let appGroupID = "group.com.13110inc.ScreenControl"
+    private let selectionKey = "shared.selection"
+
+    
+    init() {
+        Task {
+            print("App group available:",
+                  FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroupID))
+
+            await self.refreshAuthorization()
+            self.reapplyShieldOnLaunch()
+            self.loadSelection()       // <-- IMPORTANT
+
+        }
+    }
+
+
+    func refreshAuthorization() async {
+        await MainActor.run { self.isLoading = true }
+        do {
+            // Re-requesting does NOT show the prompt again if already granted
+            try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
+        } catch {
+            print("❌ Authorization request failed:", error)
+        }
+
+        let status = AuthorizationCenter.shared.authorizationStatus
+
+        await MainActor.run {
+            self.authorized = (status == .approved)
+            self.isLoading = false
+        }
+    }
 
     // MARK: - Authorization
     func requestAuthorization() async {
         do {
             try await AuthorizationCenter.shared.requestAuthorization(for: .individual)
-            authorized = true
         } catch {
             print("❌ ScreenTime auth failed:", error)
         }
+
+        await refreshAuthorization()
     }
+
+    
 
     // MARK: - Shielding
     func applyShield() {
@@ -40,76 +79,144 @@ class ScreenTimeManager: ObservableObject {
 
     // MARK: - Selection Updates
     func updateSelectedApps() {
-        selectedAppNames = selection.applications.compactMap { $0.localizedDisplayName }
-        print("📋 Selected Apps:", selectedAppNames)
+        TokenStorage.save(tokens: selection.applicationTokens)
+        print("💾 Saved \(selection.applicationTokens.count) tokens")
     }
 
-    // MARK: - Persistence
-    private let selectionKey = "SavedFamilyActivitySelection"
+
+
+
 
     func saveSelection() {
+        let shared = SharedSelection(selection)
         do {
-            let data = try JSONEncoder().encode(selection)
-            UserDefaults.standard.set(data, forKey: selectionKey)
-            print("💾 Selection saved (\(selection.applicationTokens.count) apps)")
+            let defaults = UserDefaults(suiteName: appGroupID)
+            let data = try JSONEncoder().encode(shared)
+            UserDefaults(suiteName: appGroupID)?.set(data, forKey: selectionKey)
+            
+            if let rawData = try? JSONEncoder().encode(selection) {
+                if let jsonString = String(data: rawData, encoding: .utf8) {
+                    print("RAW JSON:\n\(jsonString)")
+                } else {
+                    print("❌ Could not decode JSON string")
+                }
+                    defaults?.set(rawData, forKey: "shared.selection.raw")
+                    print("saved raw selection")
+            }
+            print("💾 Saved selection to App Group: \(shared.apps.count) apps, \(shared.categories.count) categories, \(shared.webDomains.count) domains")
         } catch {
-            print("⚠️ Failed to encode selection:", error)
+            print("❌ Failed to encode selection:", error)
         }
     }
 
+
+
     func loadSelection() {
-        if let data = UserDefaults.standard.data(forKey: selectionKey),
-           let saved = try? JSONDecoder().decode(FamilyActivitySelection.self, from: data) {
-            selection = saved
-            updateSelectedApps()
-            print("📂 Loaded saved selection (\(selection.applicationTokens.count) apps)")
-        } else {
-            print("⚠️ No saved selection found.")
-        }
-    }
-    
-    @MainActor
-    func requestAccess() async {
-        guard let url = URL(string: "\(APIConfig.baseURL)/health") else {
-            print("❌ Invalid backend URL")
+        guard
+            let data = UserDefaults(suiteName: appGroupID)?.data(forKey: selectionKey),
+            let stored = try? JSONDecoder().decode(SharedSelection.self, from: data)
+        else {
+            print("⚠️ No saved selection found in App Group.")
             return
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        var health: Bool = false
-
-        do {
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                print("❌ Invalid response type")
-                return
-            }
-
-            if httpResponse.statusCode == 200 {
-                if let result = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let status = result["status"] as? String, status == "ok" {
-                    print("✅ Backend healthy!")
-                    health = true
-                } else {
-                    print("⚠️ Unexpected JSON:", String(data: data, encoding: .utf8) ?? "")
-                    health = false
-                }
-            } else {
-                print("❌ Health check failed with status:", httpResponse.statusCode)
-                health = false
-            }
-
-        } catch {
-            print("❌ Network error:", error.localizedDescription)
-            health = false
-        }
-        
-        if health {
-            self.removeShield()
-        }
+        self.selection = stored.toFamilySelection()
+        print("📂 Loaded selection from App Group: \(self.selection.applicationTokens.count) apps")
     }
 
+
+    
+    func reapplyShieldOnLaunch() {
+        guard !selection.applicationTokens.isEmpty else { return }
+
+        store.shield.applications = selection.applicationTokens
+        store.shield.applicationCategories = .specific(selection.categoryTokens)
+        store.shield.webDomains = selection.webDomainTokens
+
+        print("🔄 Re-applied shields on launch for \(selection.applicationTokens.count) apps")
+    }
+
+
+    
+    func test30SecondUnlock() {
+        // 1. Remove shield NOW (user gets temporary access)
+
+        print("🟢 Temporary unlock started (600 seconds)")
+
+        let center = DeviceActivityCenter()
+        
+        let calendar = Calendar.current
+        let now = Date()
+
+        let startDate = now     // 1 minute later
+        let endDate   = now.addingTimeInterval(900)    // 15 minutes later
+
+        let startComponents = calendar.dateComponents([.hour, .minute], from: startDate)
+        let endComponents   = calendar.dateComponents([.hour, .minute], from: endDate)
+
+        print("Start:", startComponents)
+        print("End:", endComponents)
+
+        let schedule = DeviceActivitySchedule(
+            intervalStart: startComponents,
+            intervalEnd: endComponents,
+            repeats: false
+        )
+
+        do {
+            try center.startMonitoring(.thirtySecondTest, during: schedule)
+            print("⏱️ Scheduled!")
+        } catch {
+            print("❌ Failed to start monitoring:", error)
+        }
+
+        let activities = center.activities
+        print("🔍 Registered DeviceActivity:", activities)
+        //let defaults = UserDefaults(suiteName: "group.com.13110inc.ScreenControl")
+        let defaults = UserDefaults(suiteName: "group.com.13110inc.ScreenControl")
+
+        print("STATUS:", defaults?.string(forKey: "extension.status") ?? "none")
+        print("DEBUG:", defaults?.string(forKey: "extension.debug") ?? "none")
+        print("shouldApplyShield:", defaults?.bool(forKey: "shouldApplyShield") ?? false)
+
+
+
+
+
+    }
+
+
 }
+
+import DeviceActivity
+
+extension DeviceActivityName {
+    static let thirtySecondTest = Self("thirtySecondTest")
+}
+
+import FamilyControls
+
+
+
+struct SharedSelection: Codable {
+    let apps: [ApplicationToken]
+    let categories: [ActivityCategoryToken]
+    let webDomains: [WebDomainToken]
+
+    init(_ selection: FamilyActivitySelection) {
+        self.apps = Array(selection.applicationTokens)
+        self.categories = Array(selection.categoryTokens)
+        self.webDomains = Array(selection.webDomainTokens)
+    }
+
+    func toFamilySelection() -> FamilyActivitySelection {
+        var s = FamilyActivitySelection()
+        s.applicationTokens = Set(apps)
+        s.categoryTokens = Set(categories)
+        s.webDomainTokens = Set(webDomains)
+        return s
+    }
+}
+
+
+

@@ -15,15 +15,13 @@ struct FriendSearchResult: Identifiable, Codable {
     let profileImageURL: URL?
 }
 
-
+@MainActor
 class FriendManager: ObservableObject {
-    @Published var pendingRequests: [FriendRequest] = [
-        FriendRequest(id: "1", name: "Sarah Kim", profileImageURL: URL(string: "https://randomuser.me/api/portraits/women/65.jpg")!, type: .unlock),
-        FriendRequest(id: "2", name: "Alex Chen", profileImageURL: URL(string: "https://randomuser.me/api/portraits/men/52.jpg")!, type: .limit)
-    ]
+    @Published var pendingRequests: [FriendRequest] = []
     @Published var searchResults: [FriendSearchResult] = []
-        @Published var isSearching = false
-        @Published var searchText = ""
+    @Published var friends: [FriendSearchResult] = []
+    @Published var isSearching = false
+    @Published var searchText = ""
 
         private var cancellables = Set<AnyCancellable>()
 
@@ -39,6 +37,7 @@ class FriendManager: ObservableObject {
                 .store(in: &cancellables)
         }
 
+        
         func searchFriends(query: String) async {
             guard !query.trimmingCharacters(in: .whitespaces).isEmpty else {
                 searchResults = []
@@ -66,24 +65,136 @@ class FriendManager: ObservableObject {
         }
     
 
+    func sendFriendRequest(from fromUserId: String, to toUserId: String) async -> Bool {
+        guard let url = URL(string: "\(APIConfig.baseURL)/relationships/add") else {
+            print("❌ Invalid URL")
+            return false
+        }
+
+        let body: [String: Any] = [
+            "from_user_id": fromUserId,
+            "to_user_id": toUserId
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+
+            if http.statusCode == 201 {
+                print("📨 Friend request sent!")
+                return true
+            } else {
+                print("⚠️ Error sending request: \(String(data: data, encoding: .utf8) ?? "")")
+                return false
+            }
+
+        } catch {
+            print("❌ Network error:", error.localizedDescription)
+            return false
+        }
+    }
+
+
+    func acceptFriendRequest(friendshipId: String) async -> Bool {
+        guard let url = URL(string: "\(APIConfig.baseURL)/relationships/accept") else {
+            return false
+        }
+
+        let body: [String: Any] = [
+            "friendship_id": friendshipId
+        ]
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+
+            if http.statusCode == 200 {
+                print("🤝 Friend request accepted")
+                return true
+            } else {
+                print("⚠️ Error accepting:", String(data: data, encoding: .utf8) ?? "")
+                return false
+            }
+
+        } catch {
+            print("❌ Network error:", error.localizedDescription)
+            return false
+        }
+    }
+
     
-    func acceptRequest(_ req: FriendRequest) {
-        pendingRequests.removeAll { $0.id == req.id }
-        print("✅ Accepted request from \(req.name)")
+    func loadPendingRequests() async {
+        guard let user = AuthManager.shared.currentUser else { return }
+
+        let url = URL(string: "\(APIConfig.baseURL)/relationships/pending/\(user.id)")!
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard (response as? HTTPURLResponse)?.statusCode == 200 else { return }
+
+            let decoded = try JSONDecoder().decode([FriendRequest].self, from: data)
+            self.pendingRequests = decoded 
+
+        } catch {
+            print("❌ Failed to load pending:", error.localizedDescription)
+        }
     }
     
+    func fetchFriends(for userId: String) async {
+        guard let url = URL(string: "\(APIConfig.baseURL)/relationships/friends/\(userId)") else {
+            print("❌ Invalid friends URL")
+            return
+        }
+
+        do {
+            let (data, response) = try await URLSession.shared.data(from: url)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                print("❌ Failed to load friends")
+                return
+            }
+
+            let friends = try JSONDecoder().decode([FriendSearchResult].self, from: data)
+            self.friends = friends  // or make `friends: [Friend]` published
+        } catch {
+            print("❌ fetchFriends error:", error)
+        }
+    }
+
+
+
+
+    
     func declineRequest(_ req: FriendRequest) {
-        pendingRequests.removeAll { $0.id == req.id }
+        //pendingRequests.removeAll { $0.id == req.id }
         print("❌ Declined request from \(req.name)")
     }
 }
 
-struct FriendRequest {
-    let id: String
-    let name: String
-    let profileImageURL: URL?
-    let type: RequestType
+struct FriendRequest: Identifiable, Codable {
+    let id: String                   // maps from friendship_id
+    let name: String                 // sender name
+    let profileImageURL: URL?        // maps from profile_image_url
+    let type: RequestType = .unlock  // default since backend sends no type
+    let fromUserId: String           // sender user id
+
+    enum CodingKeys: String, CodingKey {
+        case id = "friendship_id"
+        case name
+        case profileImageURL = "profile_image_url"
+        case fromUserId = "from_user_id"
+    }
 }
+
 
 enum RequestType {
     case unlock, limit

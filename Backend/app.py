@@ -4,6 +4,7 @@ from database.db import db
 from auth.routes import auth_bp
 from relationship.routes import relationships_bp
 from health.routes import health_bp
+from notifications.routes import notifications_bp
 from config import Config
 
 
@@ -18,6 +19,7 @@ def create_app():
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(relationships_bp, url_prefix="/relationships")
     app.register_blueprint(health_bp, url_prefix="/health")
+    app.register_blueprint(notifications_bp, url_prefix="/notifications")
     
     @app.route("/")
     def index():

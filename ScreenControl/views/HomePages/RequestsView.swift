@@ -9,6 +9,7 @@ import SwiftUI
 
 struct RequestsView: View {
     @StateObject private var friendManager = FriendManager()
+    @EnvironmentObject var auth: AuthManager
     @State private var searchText = ""
     
     var body: some View {
@@ -49,7 +50,11 @@ struct RequestsView: View {
                                 Spacer()
                                 Button {
                                     print("Send request to \(user.name)")
-                                    // TODO: implement /relationships/request
+                                    print("from id \(auth.currentUser?.id ?? "") to id \(user.id)")
+                                    Task {
+                                       await friendManager.sendFriendRequest(from: auth.currentUser?.id ?? "", to: user.id)
+                                    }
+                                    
                                 } label: {
                                     Image(systemName: "plus.circle.fill")
                                         .foregroundColor(.blue)
@@ -67,11 +72,18 @@ struct RequestsView: View {
                 if !friendManager.pendingRequests.isEmpty {
                     SectionHeader(title: "Pending Requests")
                     List(friendManager.pendingRequests, id: \.id) { req in
-                        PendingRequestCell(request: req) {
-                            friendManager.acceptRequest(req)
-                        } onDecline: {
+                        PendingRequestCell(request: req,
+                        onAccept: {
+                            Task {
+                                let success = await friendManager.acceptFriendRequest(friendshipId: req.id)
+
+                                if success {
+                                    friendManager.pendingRequests.removeAll { $0.id == req.id }
+                                }
+                            }
+                        }, onDecline: {
                             friendManager.declineRequest(req)
-                        }
+                        })
                         .listRowSeparator(.hidden)
                     }
                     .listStyle(.plain)
@@ -85,12 +97,23 @@ struct RequestsView: View {
                             .font(.subheadline)
                     }
                     .padding(.top, 80)
+                    List(friendManager.friends, id: \.id) { friend in
+                        Text("Friends with \(friend.name)")
+                    }
                 }
                 
                 Spacer()
             }
             .navigationTitle("Requests")
             .background(.white)
+        }
+        .onAppear(){
+            Task {
+                await friendManager.loadPendingRequests()
+                print("my id for friends is \(auth.currentUser?.id ?? "")")
+                await friendManager.fetchFriends(for: auth.currentUser?.id ?? "")
+            }
+            
         }
     }
 }

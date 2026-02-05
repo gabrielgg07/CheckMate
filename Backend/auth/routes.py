@@ -164,3 +164,33 @@ def protected():
         return jsonify({"error": "Invalid or expired token"}), 401
 
     return jsonify({"message": f"Welcome user {decoded['user_id']}!"})
+
+@auth_bp.route("/register_device", methods=["POST"])
+def register_device():
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        return jsonify({"error": "Missing or invalid token"}), 401
+
+    jwt_token = auth_header.split("Bearer ")[1]
+    decoded = validate_jwt(jwt_token)
+    if not decoded:
+        return jsonify({"error": "Invalid or expired token"}), 401
+
+    user_id = decoded["user_id"]
+
+    user = db.session.get(User, user_id)
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    data = request.get_json()
+    device_token = data.get("device_token")
+
+    if not device_token:
+        return jsonify({"error": "Missing device_token in body"}), 400
+
+    # 🔥 SAVE THE REAL DEVICE TOKEN
+    user.device_token = device_token
+    db.session.commit()
+
+    return jsonify({"success": True})
+

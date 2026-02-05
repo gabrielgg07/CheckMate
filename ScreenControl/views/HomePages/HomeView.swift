@@ -18,10 +18,12 @@ struct HomeView: View {
                 .padding(.top, 40)
 
             // Request Screen Time access
-            Button("Request ScreenTime Access") {
-                Task { await screenTime.requestAuthorization() }
+            if !screenTime.authorized {
+                Button("Request ScreenTime Access") {
+                    Task { await screenTime.requestAuthorization() }
+                }
+                .buttonStyle(.borderedProminent)
             }
-            .buttonStyle(.borderedProminent)
 
             if screenTime.authorized {
                 Text("✅ Authorized to manage ScreenTime")
@@ -36,6 +38,9 @@ struct HomeView: View {
                 }
                 .familyActivityPicker(isPresented: $showPicker,
                                       selection: $screenTime.selection)
+                .onChange(of: screenTime.selection) { _ in
+                    screenTime.saveSelection()
+                }
 
                 // Apply or remove shields
                 HStack(spacing: 20) {
@@ -46,7 +51,7 @@ struct HomeView: View {
 
                     Button("❌ Unblock All") {
                         Task {
-                            await screenTime.requestAccess()
+                            //screenTime.removeShield()
                         }
                     }
                     .foregroundColor(.red)
@@ -54,6 +59,10 @@ struct HomeView: View {
             }
 
             Spacer()
+            Button("30 Second Test Unlock") {
+                //ScreenTimeManager.shared.test30SecondUnlock()
+            }
+
 
             Button("Logout") {
                 auth.logout()
@@ -68,40 +77,3 @@ struct HomeView: View {
 
 
 
-
-struct StatsView: View {
-    var body: some View {
-        Text("📊 Your screen time analytics")
-            .font(.title3)
-            .padding()
-    }
-}
-
-struct ProfileView: View {
-    @EnvironmentObject var auth: AuthManager
-    var body: some View {
-        VStack(spacing: 20) {
-            if let user = auth.currentUser {
-                AsyncImage(url: user.profileImageURL) { image in
-                    image.resizable().scaledToFit()
-                } placeholder: {
-                    ProgressView()
-                }
-                .frame(width: 100, height: 100)
-                .clipShape(Circle())
-
-                Text(user.name)
-                    .font(.headline)
-                Text(user.email)
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-            }
-
-            Button("Logout") {
-                auth.logout()
-            }
-            .foregroundColor(.red)
-        }
-        .padding()
-    }
-}

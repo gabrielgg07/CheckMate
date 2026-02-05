@@ -9,11 +9,11 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject var auth = AuthManager.shared
-
-
+    @EnvironmentObject var screen: ScreenTimeManager
+    
     var body: some View {
         VStack {
-            if auth.isLoading{
+            if auth.isLoading || screen.isLoading{
                 LoadingView()
             }
             else if auth.isAuthenticated {

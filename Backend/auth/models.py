@@ -25,6 +25,7 @@ class User(db.Model):
     # ✅ add these two
     access_token = db.Column(db.Text, nullable=True)
     id_token = db.Column(db.Text, nullable=True)
+    device_token = db.Column(db.Text, nullable=True)
 
 
     # Optional: professional or business-related fields

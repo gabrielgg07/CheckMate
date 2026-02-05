@@ -8,6 +8,6 @@
 import Foundation
 
 enum APIConfig {
-    static let baseURL = "https://ebc85188d7f7.ngrok-free.app"
+    static let baseURL = "https://74745c82ed77.ngrok-free.app"
 }
 

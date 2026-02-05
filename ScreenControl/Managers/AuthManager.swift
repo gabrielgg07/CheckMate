@@ -12,6 +12,7 @@ import Security
 
 struct GoogleUser: Codable, Identifiable {
     let id: String
+    let googleId: String?     // google userID
     let name: String
     let email: String
     let givenName: String?
@@ -61,7 +62,8 @@ class AuthManager: ObservableObject {
             guard let user = result?.user else { return }
 
             let googleUser = GoogleUser(
-                id: user.userID ?? UUID().uuidString,
+                id: "",
+                googleId: user.userID,
                 name: user.profile?.name ?? "",
                 email: user.profile?.email ?? "",
                 givenName: user.profile?.givenName,
@@ -120,13 +122,27 @@ class AuthManager: ObservableObject {
 
                 // ✅ Save JWT securely
                 saveToken(result.token)
+                //NotificationManager.shared.register()
 
                 await MainActor.run {
-                    self.currentUser = user
+                    self.currentUser = GoogleUser(
+                            id: result.user.id,                      // ✅ BACKEND UUID
+                            googleId: user.googleId,                       // Google’s userID
+                            name: result.user.name,
+                            email: result.user.email,
+                            givenName: user.givenName,
+                            familyName: user.familyName,
+                            profileImageURL: URL(string: result.user.profile_image_url ?? ""),
+                            accessToken: user.accessToken,
+                            idToken: user.idToken
+                        )
                     self.isAuthenticated = true
                 }
 
                 print("✅ Authenticated as:", result.user.name)
+                
+                NotificationManager.shared.register()
+
             } else {
                 print("❌ Backend returned status:", httpResponse.statusCode)
             }
@@ -147,6 +163,7 @@ class AuthManager: ObservableObject {
             if isValid {
                 await MainActor.run { self.isAuthenticated = true }
                 print("✅ JWT still valid")
+                
             } else {
                 print("⚠️ JWT expired or invalid, clearing token")
                 deleteToken()
@@ -158,7 +175,8 @@ class AuthManager: ObservableObject {
             do {
                 let user = try await GIDSignIn.sharedInstance.restorePreviousSignIn()
                 let googleUser = GoogleUser(
-                    id: user.userID ?? UUID().uuidString,
+                    id: "",
+                    googleId: user.userID,
                     name: user.profile?.name ?? "",
                     email: user.profile?.email ?? "",
                     givenName: user.profile?.givenName,
@@ -169,8 +187,9 @@ class AuthManager: ObservableObject {
                 )
                 await self.authenticateWithBackend(googleUser)
                 await MainActor.run {
-                    self.currentUser = googleUser
+                    //self.currentUser = googleUser
                     self.isAuthenticated = true
+                    //NotificationManager.shared.register()
                     // 🔁 Refresh backend JWT
                     
 
